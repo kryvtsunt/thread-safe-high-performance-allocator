@@ -1,0 +1,55 @@
+(not CCIS Linux Server)
+Operatig System: CentOS Linux release 7.3.1611;
+Processor model: Intel(R) Xeon(R) CPU X5650  @ 2.67GHz
+Number of cpu cores: 6;
+Amount of RAM: 49279700 kB = 49.3 GB; 
+
+All scenarios are tested on 100k inputs.
+_______________________________________________________
+ scenario   |1st run(s)|2nd run(s)|3rd run(s)|median(s)|
+=======================================================
+ hw7 + ivec |    >     |    >     |    >     |    >    |
+--------------------------------------------------------
+ hw7 + list |    >     |    >     |    >     |    >    | 
+--------------------------------------------------------
+ sys + ivec |   0.53   |   0.51   |   0.56   |  0.53   |
+--------------------------------------------------------
+ sys + list |   2.17   |   2.12   |   2.15   |  2.15   | 
+--------------------------------------------------------
+ par + ivec |   0.52   |   0.50   |   0.51   |  0.50   |
+--------------------------------------------------------
+ par + list |   1.88   |   1.87   |   1.86   |  1.87   | 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*> - greater than 5 minutes 
+(on the graph 5s denotes some large time) 
+
+par-malloc:
+For this challenge we implemented binning strategy. 
+Each thread has its own local arena of bins, where each bin
+is a freelist with nodes of certain size (power of 2 in our case).
+To allocate new memory, we first check whether the allocation is greater than PAGE_SIZE,
+if it is, we just allocate appropriate number of pages. 
+otherwise we check whether the bin of rounded (rounded to power of 2) size
+has a node, if it does not we go through the arena looking for nodes in 
+bins of greater size. if there exists such node we divide it (split in halves) 
+until we get the node of required size; as we divide the node,
+we insert the intermidiate nodes ( second half of division) into the 
+bins of corresponding size. If there is no bins of >= size, we create 
+a new node of size PAGE_SIZE and divide it into nodes (filling up the bins).
+We also use headers and footers to be able to merge nodes if they are both free
+and adjacent. To handle edge cases we set the last footer of allocated chunk to be 0,
+so we know that we dont need to look up the nodes after that(to the right of the node),
+and we create an empty header in front of the allocation to know when we dont need to look
+to the left of the node to merge. This technic takes care of the fragmentation, but slightly 
+slowing down our allocator, so we have it commented out. 
+We also tried to use node division when freeing
+large chunks: divide big chunk of memory into smaller nodes of power of 2 size, instead of unmmapping it
+(as we know that system calls slow down program execution, we thought that it would give us a speed up,
+but surprisingly we ended up having pretty similar time so we commented it out). 
+
+The par-malloc execution as expected occurs to be much faster than the hw7-malloc as it does not have locks and 
+has more time-efficient algorithm of allocating and freeing memory (constant time in the best-case).
+The par-malloc's execution time is also slightly faster than the system one (small inputs of the auto-testing makes the difference 
+of execution time very small, and as built-in timer is not precise enough it shows that execution time is 
+same 0.01 =0.01 on the small inputs, however the difference becomes clearly visible when testing on greater inputs)     
+   
